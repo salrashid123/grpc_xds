@@ -90,7 +90,7 @@ Now start the xDS server:
 
 ```bash
 cd xds
-go run src/main.go
+go run main.go
 
 INFO[0000] Starting control plane                       
 INFO[0000] gateway listening HTTP/1.1                    port=18001
