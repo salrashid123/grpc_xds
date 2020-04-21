@@ -47,12 +47,17 @@ var (
 
 	config cache.SnapshotCache
 
-	strSlice = []string{"be1.cluster.local", "be1.cluster.local"}
+	strSlice = []int{50051, 50052}
 )
 
 const (
-	localhost = "127.0.0.1"
-	Ads       = "ads"
+	localhost       = "127.0.0.1"
+	Ads             = "ads"
+	backendHostName = "be.cluster.local"
+	listenerName    = "be-srv"
+	routeConfigName = "be-srv-route"
+	clusterName     = "be-srv-cluster"
+	virtualHostName = "be-srv-vs"
 )
 
 func init() {
@@ -131,7 +136,7 @@ func (h Hasher) ID(node *core.Node) string {
 	return node.Id
 }
 
-const grpcMaxConcurrentStreams = 1000000
+const grpcMaxConcurrentStreams = 1000
 
 // RunManagementServer starts an xDS server at the given port.
 func RunManagementServer(ctx context.Context, server xds.Server, port uint) {
@@ -201,62 +206,45 @@ func main() {
 
 	cb.Report()
 
+	nodeId := config.GetStatusKeys()[0]
+	log.Infof(">>>>>>>>>>>>>>>>>>> creating NodeID %s", nodeId)
+
 	for _, v := range strSlice {
 
-		nodeId := config.GetStatusKeys()[0]
-
-		var remoteHost = v
-		var clusterName = "be-srv-lb.default.svc.cluster.local:50051"
-		var listenerName = "be-srv-lb.default.svc.cluster.local:50051"
-		var virtualHostName = "be-srv-lb.default.svc.cluster.local:50051"
-		var routeConfigName = "be-srv-lb.default.svc.cluster.local:50051"
-
-		log.Infof(">>>>>>>>>>>>>>>>>>> creating cluster %s  with  NodeID %s", clusterName, nodeId)
-
-		//c := []cache.Resource{resource.MakeCluster(resource.Ads, clusterName)}
-
 		// ENDPOINT
-		log.Infof(">>>>>>>>>>>>>>>>>>> creating ENDPOINT  %v", remoteHost)
+		log.Infof(">>>>>>>>>>>>>>>>>>> creating ENDPOINT for remoteHost:port %s:%d", backendHostName, v)
 		hst := &core.Address{Address: &core.Address_SocketAddress{
 			SocketAddress: &core.SocketAddress{
-				Address:  "127.0.0.1",
+				Address:  backendHostName,
 				Protocol: core.SocketAddress_TCP,
 				PortSpecifier: &core.SocketAddress_PortValue{
-					PortValue: 50051,
+					PortValue: uint32(v),
 				},
 			},
 		}}
 
-		clusterLoadAssignment := &v2.ClusterLoadAssignment{
-			ClusterName: clusterName,
-			Endpoints: []*ep.LocalityLbEndpoints{{
-				Locality: &core.Locality{
-					Region: "us-central1",
-					Zone:   "us-central1-a",
-				},
-				Priority:            0,
-				LoadBalancingWeight: &wrapperspb.UInt32Value{Value: uint32(1000)},
-				LbEndpoints: []*ep.LbEndpoint{
-					{
-						HostIdentifier: &ep.LbEndpoint_Endpoint{
-							Endpoint: &ep.Endpoint{
-								Address: hst,
-							}},
-						HealthStatus: core.HealthStatus_HEALTHY,
-					},
-				},
-			}},
-		}
-
 		eds := []cache.Resource{
-			clusterLoadAssignment,
+			&v2.ClusterLoadAssignment{
+				ClusterName: clusterName,
+				Endpoints: []*ep.LocalityLbEndpoints{{
+					Locality: &core.Locality{
+						Region: "us-central1",
+						Zone:   "us-central1-a",
+					},
+					Priority:            0,
+					LoadBalancingWeight: &wrapperspb.UInt32Value{Value: uint32(1000)},
+					LbEndpoints: []*ep.LbEndpoint{
+						{
+							HostIdentifier: &ep.LbEndpoint_Endpoint{
+								Endpoint: &ep.Endpoint{
+									Address: hst,
+								}},
+							HealthStatus: core.HealthStatus_HEALTHY,
+						},
+					},
+				}},
+			},
 		}
-
-		// eds := []cache.Resource{
-		// 	&ep.Endpoint{
-		// 		Address: hst,
-		// 	},
-		// }
 
 		// CLUSTER
 		log.Infof(">>>>>>>>>>>>>>>>>>> creating CLUSTER " + clusterName)
@@ -270,26 +258,6 @@ func main() {
 						ConfigSourceSpecifier: &core.ConfigSource_Ads{},
 					},
 				},
-				// LoadAssignment: &v2.ClusterLoadAssignment{
-				// 	Endpoints: []*ep.LocalityLbEndpoints{{
-				// 		Priority:            0,
-				// 		LoadBalancingWeight: &wrapperspb.UInt32Value{Value: uint32(1000)},
-				// 		LbEndpoints: []*ep.LbEndpoint{
-				// 			{
-				// 				HostIdentifier: &ep.LbEndpoint_Endpoint{
-				// 					Endpoint: &ep.Endpoint{
-				// 						Address: hst,
-				// 					}},
-
-				// 				// HostIdentifier: &ep.LbEndpoint_EndpointName{
-				// 				// 	EndpointName: "be-srv-lb.default.svc.cluster.local:50051",
-				// 				// },
-
-				// 				HealthStatus: core.HealthStatus_HEALTHY,
-				// 			},
-				// 		},
-				// 	}},
-				// },
 			},
 		}
 
@@ -297,7 +265,7 @@ func main() {
 		log.Infof(">>>>>>>>>>>>>>>>>>> creating RDS " + virtualHostName)
 		vh := &v2route.VirtualHost{
 			Name:    virtualHostName,
-			Domains: []string{"be-srv-lb.default.svc.cluster.local:50051"},
+			Domains: []string{listenerName}, //******************* >> must match what is specified at xds:/// //
 
 			Routes: []*v2route.Route{{
 				Match: &v2route.RouteMatch{
