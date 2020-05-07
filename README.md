@@ -38,7 +38,7 @@ thats it.
 edit `/etc/hosts`
 
 ```bash
-127.0.0.1 be.cluster.local xds.server.com
+127.0.0.1 be.cluster.local xds.domain.com
 ```
 
 ### gRPC Server
