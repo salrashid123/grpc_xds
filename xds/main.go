@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -33,6 +34,26 @@ import (
 	"github.com/golang/protobuf/ptypes"
 )
 
+// UpstreamPorts is a type that implements flag.Value interface
+type UpstreamPorts []int
+
+// String is a method that implements the flag.Value interface
+func (u *UpstreamPorts) String() string {
+	// See: https://stackoverflow.com/a/37533144/609290
+	return strings.Join(strings.Fields(fmt.Sprint(*u)), ",")
+}
+
+// Set is a method that implements the flag.Value interface
+func (u *UpstreamPorts) Set(port string) error {
+	log.Printf("[UpstreamPorts] %s", port)
+	i, err := strconv.Atoi(port)
+	if err != nil {
+		return err
+	}
+	*u = append(*u, i)
+	return nil
+}
+
 var (
 	debug       bool
 	onlyLogging bool
@@ -47,7 +68,7 @@ var (
 
 	config cache.SnapshotCache
 
-	strSlice = []int{50051, 50052}
+	upstreamPorts UpstreamPorts
 )
 
 const (
@@ -65,6 +86,8 @@ func init() {
 	flag.UintVar(&port, "port", 18000, "Management server port")
 	flag.UintVar(&gatewayPort, "gateway", 18001, "Management server port for HTTP gateway")
 	flag.StringVar(&mode, "ads", Ads, "Management server type (ads, xds, rest)")
+	// Converts repeated flags (e.g. `--upstream_port=50051 --upstream_port=50052`) into a []int
+	flag.Var(&upstreamPorts, "upstream_port", "list of upstream gRPC servers")
 }
 
 type logger struct{}
@@ -209,7 +232,7 @@ func main() {
 	nodeId := config.GetStatusKeys()[0]
 	log.Infof(">>>>>>>>>>>>>>>>>>> creating NodeID %s", nodeId)
 
-	for _, v := range strSlice {
+	for _, v := range upstreamPorts {
 
 		// ENDPOINT
 		log.Infof(">>>>>>>>>>>>>>>>>>> creating ENDPOINT for remoteHost:port %s:%d", backendHostName, v)

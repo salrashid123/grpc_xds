@@ -1,4 +1,4 @@
-## gRPC xDS Loadbalancing
+# gRPC xDS Loadbalancing
 
 Sample gRPC client/server application using the **Experimental** [xDS-Based Global Load Balancing](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md)
 
@@ -33,7 +33,7 @@ thats it.
 
 ---
 
-### Setup
+## Setup
 
 edit `/etc/hosts`
 
@@ -41,7 +41,7 @@ edit `/etc/hosts`
 127.0.0.1 be.cluster.local xds.domain.com
 ```
 
-### gRPC Server
+## gRPC Server
 
 Start gRPC Servers
 
@@ -51,7 +51,9 @@ go run src/grpc_server.go --grpcport :50051
 go run src/grpc_server.go --grpcport :50052
 ```
 
-### gRPC Client (DNS)
+> **NOTE** If you change the ports or run more servers, ensure you update the list when you start the xDS server
+
+## gRPC Client (DNS)
 
 Enable debug tracing on the client; the whole intent is to see all the details!
 
@@ -84,23 +86,25 @@ INFO: 2020/04/21 15:25:12 Channel Connectivity change to SHUTDOWN
 INFO: 2020/04/21 15:25:12 Subchannel Connectivity change to SHUTDOWN
 ```
 
-### xDS Server
+## xDS Server
 
 Now start the xDS server:
 
 ```bash
 cd xds
-go run main.go
+go run main.go --upstream_port=50051 --upstream_port=50052
 
 INFO[0000] Starting control plane                       
 INFO[0000] gateway listening HTTP/1.1                    port=18001
 INFO[0000] management server listening                   port=18000
 ```
 
+> **NOTE** Update the list of `--upstream_port` flags to reflect the list of ports for the gRPC servers that you started
 
-### gRPC Client (xDS)
 
-Edit the xds Bootstrap file and specify the `server_url`
+## gRPC Client (xDS)
+
+Ensure the xds Bootstrap file specifies the correct `server_url`
 
 The grpc client will connect to this as the the xDS server.  The gRPC client library looks for a specific env-var (`GRPC_XDS_BOOTSTRAP`) that points to the file 
 
@@ -124,82 +128,79 @@ The grpc client will connect to this as the the xDS server.  The gRPC client lib
 }
 ```
 
+Then:
+
 ```bash
 export GRPC_XDS_BOOTSTRAP=`pwd`/xds_bootstrap.json
 ```
 
-* Run the client
+Then:
 
-```
+```bash
 go run src/grpc_client.go --host xds-experimental:///be-srv
 ```
 
 in the debug logs that it connected to port `:50051`
-```
+
+```console
 INFO: 2020/04/21 16:14:42 Subchannel picks a new address "be.cluster.local:50051" to connect
 ```
 
-
 Then wait one minute and rerun the client:
 
-```
+```console
 INFO: 2020/04/21 16:16:08 Subchannel picks a new address "be.cluster.local:50052" to connect
 ```
 
 The port it connected to is `:50052`
 
+Right, that's it!
 
-right, thats it
+If you want more details...
 
----
-
-
-if you want more details...
-
-### References
+## References
 
 - [Envoy Listener proto](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/listener.proto)
 - [Envoy Cluster proto](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/cluster.proto)
 - [Envoy Endpoint proto](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/endpoint.proto)
 
 
-#### xDS Server start
+### xDS Server start
 
 ```bash
-INFO[0000] Starting control plane                       
+INFO[0000] Starting control plane
 INFO[0000] gateway listening HTTP/1.1                    port=18001
 INFO[0000] management server listening                   port=18000
-INFO[0010] OnStreamOpen 1 open for Type []              
-INFO[0010] OnStreamRequest 1  Request[type.googleapis.com/envoy.api.v2.Listener] 
+INFO[0010] OnStreamOpen 1 open for Type []
+INFO[0010] OnStreamRequest 1  Request[type.googleapis.com/envoy.api.v2.Listener]
 INFO[0010] cb.Report()  callbacks                        fetches=0 requests=1
-INFO[0010] >>>>>>>>>>>>>>>>>>> creating NodeID b7f9c818-fb46-43ca-8662-d3bdbcf7ec18~10.0.0.1 
-INFO[0010] >>>>>>>>>>>>>>>>>>> creating ENDPOINT for remoteHost:port be.cluster.local:50051 
-INFO[0010] >>>>>>>>>>>>>>>>>>> creating CLUSTER be-srv-cluster 
-INFO[0010] >>>>>>>>>>>>>>>>>>> creating RDS be-srv-vs   
-INFO[0010] >>>>>>>>>>>>>>>>>>> creating LISTENER be-srv 
-INFO[0010] >>>>>>>>>>>>>>>>>>> creating snapshot Version 1 
-INFO[0010] OnStreamResponse... 1   Request [type.googleapis.com/envoy.api.v2.Listener],  Response[type.googleapis.com/envoy.api.v2.Listener] 
+INFO[0010] >>>>>>>>>>>>>>>>>>> creating NodeID b7f9c818-fb46-43ca-8662-d3bdbcf7ec18~10.0.0.1
+INFO[0010] >>>>>>>>>>>>>>>>>>> creating ENDPOINT for remoteHost:port be.cluster.local:50051
+INFO[0010] >>>>>>>>>>>>>>>>>>> creating CLUSTER be-srv-cluster
+INFO[0010] >>>>>>>>>>>>>>>>>>> creating RDS be-srv-vs
+INFO[0010] >>>>>>>>>>>>>>>>>>> creating LISTENER be-srv
+INFO[0010] >>>>>>>>>>>>>>>>>>> creating snapshot Version 1
+INFO[0010] OnStreamResponse... 1   Request [type.googleapis.com/envoy.api.v2.Listener],  Response[type.googleapis.com/envoy.api.v2.Listener]
 INFO[0010] cb.Report()  callbacks                        fetches=0 requests=1
-INFO[0010] OnStreamRequest 1  Request[type.googleapis.com/envoy.api.v2.RouteConfiguration] 
-INFO[0010] OnStreamRequest 1  Request[type.googleapis.com/envoy.api.v2.Listener] 
-INFO[0010] OnStreamResponse... 1   Request [type.googleapis.com/envoy.api.v2.RouteConfiguration],  Response[type.googleapis.com/envoy.api.v2.RouteConfiguration] 
+INFO[0010] OnStreamRequest 1  Request[type.googleapis.com/envoy.api.v2.RouteConfiguration]
+INFO[0010] OnStreamRequest 1  Request[type.googleapis.com/envoy.api.v2.Listener]
+INFO[0010] OnStreamResponse... 1   Request [type.googleapis.com/envoy.api.v2.RouteConfiguration],  Response[type.googleapis.com/envoy.api.v2.RouteConfiguration]
 INFO[0010] cb.Report()  callbacks                        fetches=0 requests=3
-INFO[0010] OnStreamRequest 1  Request[type.googleapis.com/envoy.api.v2.RouteConfiguration] 
-INFO[0010] OnStreamRequest 1  Request[type.googleapis.com/envoy.api.v2.Cluster] 
-INFO[0010] OnStreamResponse... 1   Request [type.googleapis.com/envoy.api.v2.Cluster],  Response[type.googleapis.com/envoy.api.v2.Cluster] 
+INFO[0010] OnStreamRequest 1  Request[type.googleapis.com/envoy.api.v2.RouteConfiguration]
+INFO[0010] OnStreamRequest 1  Request[type.googleapis.com/envoy.api.v2.Cluster]
+INFO[0010] OnStreamResponse... 1   Request [type.googleapis.com/envoy.api.v2.Cluster],  Response[type.googleapis.com/envoy.api.v2.Cluster]
 INFO[0010] cb.Report()  callbacks                        fetches=0 requests=5
-INFO[0010] OnStreamRequest 1  Request[type.googleapis.com/envoy.api.v2.Cluster] 
-INFO[0010] OnStreamRequest 1  Request[type.googleapis.com/envoy.api.v2.ClusterLoadAssignment] 
-INFO[0010] OnStreamResponse... 1   Request [type.googleapis.com/envoy.api.v2.ClusterLoadAssignment],  Response[type.googleapis.com/envoy.api.v2.ClusterLoadAssignment] 
+INFO[0010] OnStreamRequest 1  Request[type.googleapis.com/envoy.api.v2.Cluster]
+INFO[0010] OnStreamRequest 1  Request[type.googleapis.com/envoy.api.v2.ClusterLoadAssignment]
+INFO[0010] OnStreamResponse... 1   Request [type.googleapis.com/envoy.api.v2.ClusterLoadAssignment],  Response[type.googleapis.com/envoy.api.v2.ClusterLoadAssignment]
 INFO[0010] cb.Report()  callbacks                        fetches=0 requests=7
-INFO[0010] OnStreamRequest 1  Request[type.googleapis.com/envoy.api.v2.ClusterLoadAssignment] 
+INFO[0010] OnStreamRequest 1  Request[type.googleapis.com/envoy.api.v2.ClusterLoadAssignment]
 INFO[0011] OnStreamClosed 1 closed
 ```
 
+### gRPC Client Call #1
 
-#### gRPC Client Call #1
-
-```
+```bash
 $ go run src/grpc_client.go --host xds-experimental:///be-srv
 
 INFO: 2020/04/21 16:14:42 parsed scheme: "xds-experimental"
@@ -320,7 +321,7 @@ INFO: 2020/04/21 16:14:43 Subchannel Connectivity change to SHUTDOWN
 INFO: 2020/04/21 16:14:43 [eds-lb 0xc000258820] Watch cancelled on resource name be-srv-cluster with xds-client 0xc00011a870
 ```
 
-#### xDS Server rotate endpoint
+### xDS Server rotate endpoint
 
 ```bash
 INFO[0070] >>>>>>>>>>>>>>>>>>> creating ENDPOINT for remoteHost:port be.cluster.local:50052 
@@ -330,7 +331,7 @@ INFO[0070] >>>>>>>>>>>>>>>>>>> creating LISTENER be-srv
 INFO[0070] >>>>>>>>>>>>>>>>>>> creating snapshot Version 2 
 ```
 
-#### gRPC Server Call #2
+### gRPC Server Call #2
 ```
 $ go run src/grpc_client.go --host xds-experimental:///be-srv
 
