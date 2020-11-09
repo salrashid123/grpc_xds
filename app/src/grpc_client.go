@@ -39,13 +39,13 @@ func main() {
 	c := echo.NewEchoServerClient(conn)
 	ctx := context.Background()
 
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 15; i++ {
 		r, err := c.SayHello(ctx, &echo.EchoRequest{Name: "unary RPC msg "})
 		if err != nil {
 			log.Fatalf("could not greet: %v", err)
 		}
-		time.Sleep(1 * time.Second)
 		log.Printf("RPC Response: %v %v", i, r)
+		time.Sleep(5 * time.Second)
 	}
 
 }

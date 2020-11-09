@@ -20,8 +20,9 @@ import (
 )
 
 var (
-	grpcport = flag.String("grpcport", "", "grpcport")
-	hs       *health.Server
+	grpcport   = flag.String("grpcport", "", "grpcport")
+	servername = flag.String("servername", "server1", "grpcport")
+	hs         *health.Server
 
 	conn *grpc.ClientConn
 )
@@ -41,11 +42,7 @@ func (s *server) SayHello(ctx context.Context, in *echo.EchoRequest) (*echo.Echo
 
 	log.Println("Got rpc: --> ", in.Name)
 
-	var h, err = os.Hostname()
-	if err != nil {
-		log.Fatalf("Unable to get hostname %v", err)
-	}
-	return &echo.EchoReply{Message: "Hello " + in.Name + "  from hostname " + h}, nil
+	return &echo.EchoReply{Message: "Hello " + in.Name + "  from " + *servername}, nil
 }
 
 func (s *server) SayHelloStream(in *echo.EchoRequest, stream echo.EchoServer_SayHelloStreamServer) error {
@@ -90,7 +87,7 @@ func main() {
 	echo.RegisterEchoServerServer(s, &server{})
 
 	healthpb.RegisterHealthServer(s, &healthServer{})
-
+	log.Println("Starting grpcServer")
 	s.Serve(lis)
 
 }

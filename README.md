@@ -23,9 +23,7 @@ When the client first bootstraps to the xDS server, it sends down instructions t
 
 Then wait a minute (really)
 
-The xDS server will rotate the valid endpoint targets it has (which is really one; a trivial example, truly).  The second target is the second port where the second gRPC endpoint is running.
-
-The next time you run the gRPC client, it will automatically received endpoint instructions from the xDS server and connect to the second gRPC server.
+The xDS server will rotate the valid backend endpoint targets 60 seconds after it starts up (a trivial example, truly).  The second target is the second port where the second gRPC endpoint is running.
 
 
 thats it.
@@ -47,8 +45,8 @@ Start gRPC Servers
 
 ```bash
 cd app/
-go run src/grpc_server.go --grpcport :50051
-go run src/grpc_server.go --grpcport :50052
+go run src/grpc_server.go --grpcport :50051 --servername server1
+go run src/grpc_server.go --grpcport :50052 --servername server1
 ```
 
 > **NOTE** If you change the ports or run more servers, ensure you update the list when you start the xDS server
@@ -146,7 +144,8 @@ in the debug logs that it connected to port `:50051`
 INFO: 2020/04/21 16:14:42 Subchannel picks a new address "be.cluster.local:50051" to connect
 ```
 
-Then wait one minute and rerun the client:
+The grpc client will issue grpc requests every 5 seconds using the list of backend services it gets from the xds server.
+Since the xds server will abruptly rotate the grpc backend servers, the client will suddenly connect to `server2`
 
 ```console
 INFO: 2020/04/21 16:16:08 Subchannel picks a new address "be.cluster.local:50052" to connect
@@ -155,6 +154,30 @@ INFO: 2020/04/21 16:16:08 Subchannel picks a new address "be.cluster.local:50052
 The port it connected to is `:50052`
 
 Right, that's it!
+
+---
+
+```
+$ go run src/grpc_client.go --host xds-experimental:///be-srv
+2020/11/09 08:28:59 RPC Response: 0 message:"Hello unary RPC msg   from server1" 
+2020/11/09 08:29:04 RPC Response: 1 message:"Hello unary RPC msg   from server1" 
+2020/11/09 08:29:09 RPC Response: 2 message:"Hello unary RPC msg   from server1" 
+2020/11/09 08:29:14 RPC Response: 3 message:"Hello unary RPC msg   from server1" 
+2020/11/09 08:29:19 RPC Response: 4 message:"Hello unary RPC msg   from server1" 
+2020/11/09 08:29:24 RPC Response: 5 message:"Hello unary RPC msg   from server1" 
+2020/11/09 08:29:29 RPC Response: 6 message:"Hello unary RPC msg   from server1" 
+2020/11/09 08:29:34 RPC Response: 7 message:"Hello unary RPC msg   from server1" 
+2020/11/09 08:29:39 RPC Response: 8 message:"Hello unary RPC msg   from server1" 
+2020/11/09 08:29:44 RPC Response: 9 message:"Hello unary RPC msg   from server1" 
+2020/11/09 08:29:49 RPC Response: 10 message:"Hello unary RPC msg   from server1" 
+2020/11/09 08:29:54 RPC Response: 11 message:"Hello unary RPC msg   from server1" 
+2020/11/09 08:29:59 RPC Response: 12 message:"Hello unary RPC msg   from server2"   <<<<<<<<
+2020/11/09 08:30:04 RPC Response: 13 message:"Hello unary RPC msg   from server2" 
+2020/11/09 08:30:09 RPC Response: 14 message:"Hello unary RPC msg   from server2" 
+
+```
+
+---
 
 If you want more details...
 
@@ -200,7 +223,7 @@ INFO[0011] OnStreamClosed 1 closed
 
 ### gRPC Client Call #1
 
-```bash
+```log
 $ go run src/grpc_client.go --host xds-experimental:///be-srv
 
 INFO: 2020/04/21 16:14:42 parsed scheme: "xds-experimental"
@@ -332,7 +355,7 @@ INFO[0070] >>>>>>>>>>>>>>>>>>> creating snapshot Version 2
 ```
 
 ### gRPC Server Call #2
-```
+```log
 $ go run src/grpc_client.go --host xds-experimental:///be-srv
 
 INFO: 2020/04/21 16:16:08 parsed scheme: "xds-experimental"
