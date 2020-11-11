@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc"
 
 	//	"google.golang.org/grpc/resolver"
-	_ "google.golang.org/grpc/xds/experimental"
+	_ "google.golang.org/grpc/xds"
 )
 
 const ()

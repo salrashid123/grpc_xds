@@ -4,8 +4,8 @@ go 1.13
 
 require (
 	echo v0.0.0
-	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
-	google.golang.org/grpc v1.28.1
+	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
+	google.golang.org/grpc v1.33.2
 )
 
 replace echo => ./src/echo

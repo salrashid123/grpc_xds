@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"net"
-	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,8 +18,9 @@ import (
 	lv2 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v2"
 
 	ep "github.com/envoyproxy/go-control-plane/envoy/api/v2/endpoint"
-	"github.com/envoyproxy/go-control-plane/pkg/cache"
-	xds "github.com/envoyproxy/go-control-plane/pkg/server"
+	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
+	"github.com/envoyproxy/go-control-plane/pkg/cache/v2"
+	xds "github.com/envoyproxy/go-control-plane/pkg/server/v2"
 
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -190,18 +190,18 @@ func RunManagementServer(ctx context.Context, server xds.Server, port uint) {
 	grpcServer.GracefulStop()
 }
 
-// RunManagementGateway starts an HTTP gateway to an xDS server.
-func RunManagementGateway(ctx context.Context, srv xds.Server, port uint) {
-	log.WithFields(log.Fields{"port": port}).Info("gateway listening HTTP/1.1")
+// 11/11/20 TODO:  optionally set this up
+// // RunManagementGateway starts an HTTP gateway to an xDS server.
+// func RunManagementGateway(ctx context.Context, srv xds.Server, port uint) {
+// 	log.WithFields(log.Fields{"port": port}).Info("gateway listening HTTP/1.1")
 
-	server := &http.Server{Addr: fmt.Sprintf(":%d", port), Handler: &xds.HTTPGateway{Server: srv}}
-	go func() {
-		if err := server.ListenAndServe(); err != nil {
-			log.Error(err)
-		}
-	}()
-
-}
+// 	server := &http.Server{Addr: fmt.Sprintf(":%d", port), Handler: &xds.HTTPGateway{Server: srv}}
+// 	go func() {
+// 		if err := server.ListenAndServe(); err != nil {
+// 			log.Error(err)
+// 		}
+// 	}()
+// }
 
 func main() {
 	flag.Parse()
@@ -223,7 +223,7 @@ func main() {
 	srv := xds.NewServer(ctx, config, cb)
 
 	go RunManagementServer(ctx, srv, port)
-	go RunManagementGateway(ctx, srv, gatewayPort)
+	//go RunManagementGateway(ctx, srv, gatewayPort)
 
 	<-signal
 
@@ -246,7 +246,8 @@ func main() {
 			},
 		}}
 
-		eds := []cache.Resource{
+		//eds := []cache.Resource{
+		eds := []types.Resource{
 			&v2.ClusterLoadAssignment{
 				ClusterName: clusterName,
 				Endpoints: []*ep.LocalityLbEndpoints{{
@@ -271,7 +272,7 @@ func main() {
 
 		// CLUSTER
 		log.Infof(">>>>>>>>>>>>>>>>>>> creating CLUSTER " + clusterName)
-		cls := []cache.Resource{
+		cls := []types.Resource{
 			&v2.Cluster{
 				Name:                 clusterName,
 				LbPolicy:             v2.Cluster_ROUND_ROBIN,
@@ -305,7 +306,7 @@ func main() {
 				},
 			}}}
 
-		rds := []cache.Resource{
+		rds := []types.Resource{
 			&v2.RouteConfiguration{
 				Name:         routeConfigName,
 				VirtualHosts: []*v2route.VirtualHost{vh},
@@ -335,7 +336,7 @@ func main() {
 			panic(err)
 		}
 
-		l := []cache.Resource{
+		l := []types.Resource{
 			&v2.Listener{
 				Name: listenerName,
 				ApiListener: &lv2.ApiListener{
@@ -343,12 +344,14 @@ func main() {
 				},
 			}}
 
-		// =================================================================================
+		rt := []types.Resource{}
+		sec := []types.Resource{}
 
+		// =================================================================================
 		atomic.AddInt32(&version, 1)
 		log.Infof(">>>>>>>>>>>>>>>>>>> creating snapshot Version " + fmt.Sprint(version))
 
-		snap := cache.NewSnapshot(fmt.Sprint(version), eds, cls, rds, l, nil)
+		snap := cache.NewSnapshot(fmt.Sprint(version), eds, cls, rds, l, rt, sec)
 
 		config.SetSnapshot(nodeId, snap)
 
