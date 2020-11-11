@@ -1,8 +1,6 @@
 # gRPC xDS Loadbalancing
 
-Sample gRPC client/server application using the **Experimental** [xDS-Based Global Load Balancing](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md)
-
-As it is experimental, any of this can change at anytime and break...
+Sample gRPC client/server application using  [xDS-Based Global Load Balancing](https://godoc.org/google.golang.org/grpc/xds)
 
 _caveat emptor_
 
