@@ -4,34 +4,32 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"net"
 	"strconv"
 	"strings"
+
+	"net"
+
 	"sync"
 	"sync/atomic"
 	"time"
 
-	v2 "github.com/envoyproxy/go-control-plane/envoy/api/v2"
-	v2route "github.com/envoyproxy/go-control-plane/envoy/api/v2/route"
+	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 
-	core "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
-	lv2 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v2"
-
-	ep "github.com/envoyproxy/go-control-plane/envoy/api/v2/endpoint"
+	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
+	endpoint "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
+	ep "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
+	listener "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
+	lv2 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
+	route "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
+	hcm "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
+	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
-	"github.com/envoyproxy/go-control-plane/pkg/cache/v2"
-	xds "github.com/envoyproxy/go-control-plane/pkg/server/v2"
-
+	cachev3 "github.com/envoyproxy/go-control-plane/pkg/cache/v3"
+	xds "github.com/envoyproxy/go-control-plane/pkg/server/v3"
+	"github.com/golang/protobuf/ptypes"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
-
-	wrapperspb "github.com/golang/protobuf/ptypes/wrappers"
-
-	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v2"
-
-	hcm "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/http_connection_manager/v2"
-
-	"github.com/golang/protobuf/ptypes"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 // UpstreamPorts is a type that implements flag.Value interface
@@ -66,7 +64,7 @@ var (
 
 	version int32
 
-	config cache.SnapshotCache
+	config cachev3.SnapshotCache
 
 	upstreamPorts UpstreamPorts
 )
@@ -110,7 +108,7 @@ func (cb *callbacks) OnStreamOpen(ctx context.Context, id int64, typ string) err
 func (cb *callbacks) OnStreamClosed(id int64) {
 	log.Infof("OnStreamClosed %d closed", id)
 }
-func (cb *callbacks) OnStreamRequest(id int64, r *v2.DiscoveryRequest) error {
+func (cb *callbacks) OnStreamRequest(id int64, r *discovery.DiscoveryRequest) error {
 	log.Infof("OnStreamRequest %d  Request[%v]", id, r.TypeUrl)
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
@@ -121,11 +119,11 @@ func (cb *callbacks) OnStreamRequest(id int64, r *v2.DiscoveryRequest) error {
 	}
 	return nil
 }
-func (cb *callbacks) OnStreamResponse(id int64, req *v2.DiscoveryRequest, resp *v2.DiscoveryResponse) {
+func (cb *callbacks) OnStreamResponse(id int64, req *discovery.DiscoveryRequest, resp *discovery.DiscoveryResponse) {
 	log.Infof("OnStreamResponse... %d   Request [%v],  Response[%v]", id, req.TypeUrl, resp.TypeUrl)
 	cb.Report()
 }
-func (cb *callbacks) OnFetchRequest(ctx context.Context, req *v2.DiscoveryRequest) error {
+func (cb *callbacks) OnFetchRequest(ctx context.Context, req *discovery.DiscoveryRequest) error {
 	log.Infof("OnFetchRequest... Request [%v]", req.TypeUrl)
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
@@ -136,8 +134,26 @@ func (cb *callbacks) OnFetchRequest(ctx context.Context, req *v2.DiscoveryReques
 	}
 	return nil
 }
-func (cb *callbacks) OnFetchResponse(req *v2.DiscoveryRequest, resp *v2.DiscoveryResponse) {
+func (cb *callbacks) OnFetchResponse(req *discovery.DiscoveryRequest, resp *discovery.DiscoveryResponse) {
 	log.Infof("OnFetchResponse... Resquest[%v],  Response[%v]", req.TypeUrl, resp.TypeUrl)
+}
+
+func (cb *callbacks) OnDeltaStreamClosed(id int64) {
+	log.Infof("OnDeltaStreamClosed... %v", id)
+}
+
+func (cb *callbacks) OnDeltaStreamOpen(ctx context.Context, id int64, typ string) error {
+	log.Infof("OnDeltaStreamOpen... %v  of type %s", id, typ)
+	return nil
+}
+
+func (c *callbacks) OnStreamDeltaRequest(i int64, request *discovery.DeltaDiscoveryRequest) error {
+	log.Infof("OnStreamDeltaRequest... %v  of type %s", i, request)
+	return nil
+}
+
+func (c *callbacks) OnStreamDeltaResponse(i int64, request *discovery.DeltaDiscoveryRequest, response *discovery.DeltaDiscoveryResponse) {
+	log.Infof("OnStreamDeltaResponse... %v  of type %s", i, request)
 }
 
 type callbacks struct {
@@ -174,10 +190,6 @@ func RunManagementServer(ctx context.Context, server xds.Server, port uint) {
 
 	// register services
 	discovery.RegisterAggregatedDiscoveryServiceServer(grpcServer, server)
-	v2.RegisterEndpointDiscoveryServiceServer(grpcServer, server)
-	v2.RegisterClusterDiscoveryServiceServer(grpcServer, server)
-	v2.RegisterRouteDiscoveryServiceServer(grpcServer, server)
-	v2.RegisterListenerDiscoveryServiceServer(grpcServer, server)
 
 	log.WithFields(log.Fields{"port": port}).Info("management server listening")
 	go func() {
@@ -218,7 +230,7 @@ func main() {
 		fetches:  0,
 		requests: 0,
 	}
-	config = cache.NewSnapshotCache(true, cache.IDHash{}, nil)
+	config = cachev3.NewSnapshotCache(true, cachev3.IDHash{}, nil)
 
 	srv := xds.NewServer(ctx, config, cb)
 
@@ -248,7 +260,7 @@ func main() {
 
 		//eds := []cache.Resource{
 		eds := []types.Resource{
-			&v2.ClusterLoadAssignment{
+			&endpoint.ClusterLoadAssignment{
 				ClusterName: clusterName,
 				Endpoints: []*ep.LocalityLbEndpoints{{
 					Locality: &core.Locality{
@@ -273,11 +285,11 @@ func main() {
 		// CLUSTER
 		log.Infof(">>>>>>>>>>>>>>>>>>> creating CLUSTER " + clusterName)
 		cls := []types.Resource{
-			&v2.Cluster{
+			&cluster.Cluster{
 				Name:                 clusterName,
-				LbPolicy:             v2.Cluster_ROUND_ROBIN,
-				ClusterDiscoveryType: &v2.Cluster_Type{Type: v2.Cluster_EDS},
-				EdsClusterConfig: &v2.Cluster_EdsClusterConfig{
+				LbPolicy:             cluster.Cluster_ROUND_ROBIN,
+				ClusterDiscoveryType: &cluster.Cluster_Type{Type: cluster.Cluster_EDS},
+				EdsClusterConfig: &cluster.Cluster_EdsClusterConfig{
 					EdsConfig: &core.ConfigSource{
 						ConfigSourceSpecifier: &core.ConfigSource_Ads{},
 					},
@@ -287,19 +299,19 @@ func main() {
 
 		// RDS
 		log.Infof(">>>>>>>>>>>>>>>>>>> creating RDS " + virtualHostName)
-		vh := &v2route.VirtualHost{
+		vh := &route.VirtualHost{
 			Name:    virtualHostName,
 			Domains: []string{listenerName}, //******************* >> must match what is specified at xds:/// //
 
-			Routes: []*v2route.Route{{
-				Match: &v2route.RouteMatch{
-					PathSpecifier: &v2route.RouteMatch_Prefix{
+			Routes: []*route.Route{{
+				Match: &route.RouteMatch{
+					PathSpecifier: &route.RouteMatch_Prefix{
 						Prefix: "",
 					},
 				},
-				Action: &v2route.Route_Route{
-					Route: &v2route.RouteAction{
-						ClusterSpecifier: &v2route.RouteAction_Cluster{
+				Action: &route.Route_Route{
+					Route: &route.RouteAction{
+						ClusterSpecifier: &route.RouteAction_Cluster{
 							Cluster: clusterName,
 						},
 					},
@@ -307,9 +319,9 @@ func main() {
 			}}}
 
 		rds := []types.Resource{
-			&v2.RouteConfiguration{
+			&route.RouteConfiguration{
 				Name:         routeConfigName,
-				VirtualHosts: []*v2route.VirtualHost{vh},
+				VirtualHosts: []*route.VirtualHost{vh},
 			},
 		}
 
@@ -337,7 +349,7 @@ func main() {
 		}
 
 		l := []types.Resource{
-			&v2.Listener{
+			&listener.Listener{
 				Name: listenerName,
 				ApiListener: &lv2.ApiListener{
 					ApiListener: pbst,
@@ -351,7 +363,7 @@ func main() {
 		atomic.AddInt32(&version, 1)
 		log.Infof(">>>>>>>>>>>>>>>>>>> creating snapshot Version " + fmt.Sprint(version))
 
-		snap := cache.NewSnapshot(fmt.Sprint(version), eds, cls, rds, l, rt, sec)
+		snap := cachev3.NewSnapshot(fmt.Sprint(version), eds, cls, rds, l, rt, sec)
 
 		config.SetSnapshot(nodeId, snap)
 
