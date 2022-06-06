@@ -188,10 +188,6 @@ Right, that's it!
 ---
 
 ```log
-$ go run src/grpc_client.go --host xds:///be-srv
-
-
-```log
 unset GRPC_GO_LOG_VERBOSITY_LEVEL
 unset GRPC_GO_LOG_SEVERITY_LEVEL
 
