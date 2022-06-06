@@ -12,8 +12,8 @@ import (
 	"google.golang.org/grpc"
 
 	"google.golang.org/grpc/admin"
-	//_ "google.golang.org/grpc/resolver" // use for "dns:///be.cluster.local:50051"
-	_ "google.golang.org/grpc/xds" // use for xds-experimental:///be-srv
+	_ "google.golang.org/grpc/resolver" // use for "dns:///be.cluster.local:50051"
+	_ "google.golang.org/grpc/xds"      // use for xds-experimental:///be-srv
 )
 
 const ()
@@ -32,7 +32,7 @@ func main() {
 	// (optional) start background grpc admin services to monitor client
 	// "google.golang.org/grpc/admin"
 	go func() {
-		lis, err := net.Listen("tcp", ":50053")
+		lis, err := net.Listen("tcp", ":19000")
 		if err != nil {
 			log.Fatalf("failed to listen: %v", err)
 		}
@@ -45,6 +45,7 @@ func main() {
 		}
 		defer cleanup()
 
+		log.Printf("Admin port listen on :%s", lis.Addr().String())
 		if err := grpcServer.Serve(lis); err != nil {
 			log.Fatalf("failed to serve: %v", err)
 		}
@@ -60,13 +61,13 @@ func main() {
 	c := echo.NewEchoServerClient(conn)
 	ctx := context.Background()
 
-	for i := 0; i < 15; i++ {
+	for i := 0; i < 30; i++ {
 		r, err := c.SayHello(ctx, &echo.EchoRequest{Name: "unary RPC msg "})
 		if err != nil {
 			log.Fatalf("could not greet: %v", err)
 		}
 		log.Printf("RPC Response: %v %v", i, r)
-		time.Sleep(5 * time.Second)
+		time.Sleep(2 * time.Second)
 	}
 
 }
