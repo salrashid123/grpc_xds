@@ -1,9 +1,10 @@
 package main
 
 import (
-	"echo"
 	"flag"
 	"net"
+
+	"github.com/salrashid123/gcegrpc/app/echo"
 
 	"log"
 	"time"

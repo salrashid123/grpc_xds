@@ -108,7 +108,7 @@ func (cb *callbacks) OnStreamOpen(ctx context.Context, id int64, typ string) err
 	log.Infof("OnStreamOpen %d open for Type [%s]", id, typ)
 	return nil
 }
-func (cb *callbacks) OnStreamClosed(id int64) {
+func (cb *callbacks) OnStreamClosed(id int64, cn *core.Node) {
 	log.Infof("OnStreamClosed %d closed", id)
 }
 func (cb *callbacks) OnStreamRequest(id int64, r *discovery.DiscoveryRequest) error {
@@ -141,7 +141,7 @@ func (cb *callbacks) OnFetchResponse(req *discovery.DiscoveryRequest, resp *disc
 	log.Infof("OnFetchResponse... Resquest[%v],  Response[%v]", req.TypeUrl, resp.TypeUrl)
 }
 
-func (cb *callbacks) OnDeltaStreamClosed(id int64) {
+func (cb *callbacks) OnDeltaStreamClosed(id int64, cn *core.Node) {
 	log.Infof("OnDeltaStreamClosed... %v", id)
 }
 

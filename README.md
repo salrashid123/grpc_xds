@@ -163,6 +163,8 @@ The grpc client will connect to this as the the xDS server.  The gRPC client lib
 Then:
 
 ```bash
+cd app/
+
 export GRPC_XDS_BOOTSTRAP=`pwd`/xds_bootstrap.json
 
 go run src/grpc_client.go --host xds:///be-srv
